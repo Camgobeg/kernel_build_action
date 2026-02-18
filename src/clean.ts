@@ -68,7 +68,11 @@ export function cleanBuildArtifacts(buildDir: string): void {
  */
 export function cleanToolchains(): void {
   const home = process.env.HOME || '/home/runner';
-  const toolchains = [path.join(home, 'clang'), path.join(home, 'gcc-64'), path.join(home, 'gcc-32')];
+  const toolchains = [
+    path.join(home, 'clang'),
+    path.join(home, 'gcc-64'),
+    path.join(home, 'gcc-32'),
+  ];
 
   for (const toolchain of toolchains) {
     if (dirExists(toolchain)) {
@@ -177,15 +181,4 @@ export async function cleanAll(options: {
   core.endGroup();
 }
 
-/**
- * Get environment cleanup commands (for shell eval)
- */
-export function getEnvCleanupCommands(): string {
-  let commands = '';
-  for (const varName of ENV_VARS_TO_CLEAN) {
-    if (process.env[varName]) {
-      commands += `unset ${varName}\n`;
-    }
-  }
-  return commands;
-}
+

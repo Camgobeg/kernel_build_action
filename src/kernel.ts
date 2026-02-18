@@ -41,7 +41,7 @@ export async function cloneKernel(
   if (depth !== '0') {
     args.push('--depth', depth);
   }
-  args.push(url, targetDir);
+  args.push('--', url, targetDir);
 
   await exec.exec('git', args);
 
@@ -65,7 +65,7 @@ export async function cloneVendor(
   if (depth !== '0') {
     args.push('--depth', depth);
   }
-  args.push(url, targetDir);
+  args.push('--', url, targetDir);
 
   await exec.exec('git', args);
 
@@ -109,6 +109,9 @@ export function getKernelVersion(kernelDir: string): KernelVersion {
  * Get config file path
  */
 export function getConfigPath(kernelDir: string, arch: string, config: string): string {
+  if (arch.includes('..') || config.includes('..')) {
+    throw new Error('Invalid arch or config: path traversal detected');
+  }
   return path.join(kernelDir, 'arch', arch, 'configs', config);
 }
 
@@ -137,7 +140,10 @@ export async function setupMkdtboimg(kernelDir: string, actionPath: string): Pro
         fs.rmSync(mkdtboimgPath);
         fs.copyFileSync(actionMkdtboimg, mkdtboimgPath);
         core.endGroup();
-      } else if (content.includes('scripts/ufdt') && !dirExists(path.join(kernelDir, 'scripts', 'ufdt'))) {
+      } else if (
+        content.includes('scripts/ufdt') &&
+        !dirExists(path.join(kernelDir, 'scripts', 'ufdt'))
+      ) {
         const ufdtDir = path.join(kernelDir, 'ufdt', 'libufdt', 'utils', 'src');
         fs.mkdirSync(ufdtDir, { recursive: true });
         fs.copyFileSync(actionMkdtboimg, path.join(ufdtDir, 'mkdtboimg.py'));

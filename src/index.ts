@@ -1,15 +1,8 @@
 import * as core from '@actions/core';
 import * as path from 'path';
 
-import {
-  checkEnvironment,
-  installDependencies,
-  getActionPath,
-  installSystemClang,
-} from './utils';
+import { checkEnvironment, installDependencies, getActionPath, installSystemClang } from './utils';
 import { setupCcache, saveCcache, setupCcacheSymlinks } from './cache';
-import { cleanAll } from './clean';
-import { analyzeBuildErrors } from './error';
 import { setupToolchains, ToolchainConfig, getSystemToolchainPaths } from './toolchain';
 import {
   cloneKernel,
@@ -26,44 +19,6 @@ import { buildKernel, isBuildSuccessful } from './builder';
 import { packageKernel } from './packager';
 import { uploadArtifacts } from './artifact';
 import { createRelease } from './release';
-
-/**
- * Post action - cleanup and error analysis
- */
-async function post(): Promise<void> {
-  try {
-    core.info('Running post-action cleanup...');
-
-    // Check if build failed
-    const buildFailed = core.getState('BUILD_FAILED') === 'true';
-
-    if (buildFailed) {
-      core.startGroup('Analyzing build errors');
-      const kernelDir = core.getInput('kernel-dir') || 'kernel';
-      const fullKernelDir = path.join('kernel', kernelDir);
-      analyzeBuildErrors(fullKernelDir);
-      core.endGroup();
-    }
-
-    // Cleanup
-    const kernelDir = core.getInput('kernel-dir') || 'kernel';
-    const fullKernelDir = path.join('kernel', kernelDir);
-
-    await cleanAll({
-      kernelDir: fullKernelDir,
-      buildDir: 'build',
-      toolchains: true,
-      ccache: false,
-      env: true,
-    });
-
-    core.info('Cleanup completed!');
-  } catch (error) {
-    if (error instanceof Error) {
-      core.warning(`Post-action failed: ${error.message}`);
-    }
-  }
-}
 
 /**
  * Main action - build kernel
@@ -187,12 +142,7 @@ async function main(): Promise<void> {
     // Clone vendor if enabled
     if (inputs.vendor && inputs.vendorUrl) {
       const fullVendorDir = path.join('kernel', inputs.vendorDir);
-      await cloneVendor(
-        inputs.vendorUrl,
-        inputs.vendorBranch,
-        inputs.depth,
-        fullVendorDir
-      );
+      await cloneVendor(inputs.vendorUrl, inputs.vendorBranch, inputs.depth, fullVendorDir);
     }
 
     // Change to kernel directory
@@ -282,6 +232,7 @@ async function main(): Promise<void> {
       anykernel3Url: inputs.anykernel3Url,
       bootimgUrl: inputs.bootimgUrl,
       buildDir,
+      release: inputs.release,
     });
 
     // Save ccache if enabled
@@ -328,11 +279,5 @@ async function main(): Promise<void> {
   }
 }
 
-// Run the appropriate phase
-if (process.env.ACTIONS_POST === 'true') {
-  // Post phase
-  post();
-} else {
-  // Main phase
-  main();
-}
+// Run main action
+main();

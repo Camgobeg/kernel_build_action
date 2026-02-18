@@ -21,6 +21,17 @@ export interface BuildConfig {
 export async function buildKernel(config: BuildConfig): Promise<boolean> {
   core.startGroup('Building Kernel with selected cross compiler');
 
+  // Validate config doesn't start with hyphen to prevent command injection
+  if (config.config.startsWith('-')) {
+    throw new Error('config input must not start with a hyphen');
+  }
+
+  // Validate arch matches expected patterns to prevent command injection
+  const validArchs = ['arm', 'arm64', 'x86', 'x86_64', 'riscv', 'riscv64', 'mips', 'mips64'];
+  if (!validArchs.includes(config.arch)) {
+    throw new Error(`Invalid architecture: ${config.arch}. Valid options: ${validArchs.join(', ')}`);
+  }
+
   const outDir = path.join(config.kernelDir, 'out');
   fs.mkdirSync(outDir, { recursive: true });
 
@@ -96,8 +107,9 @@ export async function buildKernel(config: BuildConfig): Promise<boolean> {
   const extraArgs = parseExtraMakeArgs(config.extraMakeArgs);
   const safeExtraArgs = filterMakeArgs(extraArgs);
 
-      // Build make arguments
-      const makeArgs = [    `-j${os.cpus().length}`,
+  // Build make arguments
+  const makeArgs = [
+    `-j${os.cpus().length}`,
     config.config,
     `ARCH=${config.arch}`,
     'O=out',

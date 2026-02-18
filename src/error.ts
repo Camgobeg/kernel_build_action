@@ -71,8 +71,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
       'This is a severe type mismatch. Usually the function return type does not match the expected type (e.g., returning int but expecting pointer). May need to modify source code or use a more compatible compiler.',
   },
   {
-    pattern:
-      /MODULE_IMPORT_NS\(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver\)/i,
+    pattern: /MODULE_IMPORT_NS\(VFS_internal_I_am_really_a_filesystem_and_am_NOT_a_driver\)/i,
     type: 'Clang Version Anomaly',
     suggestion:
       'This is a compiler and KernelSU compatibility issue, usually occurs with KernelSU official version and SukiSU-Ultra. For official version, you can choose the old v0.9.5 version; for SukiSU-Ultra, it is generally recommended to switch to a different KernelSU branch.',
@@ -87,7 +86,7 @@ const ERROR_PATTERNS: ErrorPattern[] = [
     pattern: /multiple definition of 'yylloc'/i,
     type: 'Kernel Defect',
     suggestion:
-      "Modify YYLTYPE yylloc to extern YYLTYPE yylloc in scripts/dtc/dtc-lexer.lex.c_shipped",
+      'Modify YYLTYPE yylloc to extern YYLTYPE yylloc in scripts/dtc/dtc-lexer.lex.c_shipped',
   },
   {
     pattern: /assembler command failed with exit code 1/i,
@@ -285,9 +284,7 @@ export function analyzeErrors(logFile: string): number {
     const trimmedLine = line.trim();
 
     // Check for error start
-    if (
-      /\serror:|\sfatal error:|undefined reference to/i.test(line)
-    ) {
+    if (/\serror:|\sfatal error:|undefined reference to/i.test(line)) {
       // Save previous error block if exists
       if (processingError && currentErrorLines.length > 0) {
         const { type, suggestion } = analyzeErrorBlock(currentErrorLines);
@@ -301,9 +298,7 @@ export function analyzeErrors(logFile: string): number {
     // Check for continuation lines (notes, make errors)
     else if (
       processingError &&
-      (line.includes('note:') ||
-        (/make\[\d+\]:/.test(line) && line.includes('***')) ||
-        trimmedLine)
+      (line.includes('note:') || (/make\[\d+\]:/.test(line) && line.includes('***')) || trimmedLine)
     ) {
       currentErrorLines.push(line);
     } else {

@@ -35,6 +35,19 @@ export async function setupKernelSU(
   let ksuUrl: string;
 
   if (options.other && options.url) {
+    // Validate ksu-url uses HTTPS and comes from trusted GitHub domain
+    if (!options.url.startsWith('https://')) {
+      throw new Error('ksu-url must use HTTPS');
+    }
+    const trustedDomains = [
+      'github.com',
+      'raw.githubusercontent.com',
+      'gist.githubusercontent.com',
+    ];
+    const urlDomain = new URL(options.url).hostname;
+    if (!trustedDomains.includes(urlDomain)) {
+      throw new Error(`ksu-url must be from trusted GitHub domain: ${trustedDomains.join(', ')}`);
+    }
     ksuUrl = `${options.url}/raw/${options.version}/kernel/setup.sh`;
   } else {
     ksuUrl = `https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh`;
@@ -51,7 +64,9 @@ export async function setupKernelSU(
     kver = 'v0.9.5';
   }
 
-  core.info(`Kernel version: ${kernelVersion.version}.${kernelVersion.patchlevel}.${kernelVersion.sublevel}`);
+  core.info(
+    `Kernel version: ${kernelVersion.version}.${kernelVersion.patchlevel}.${kernelVersion.sublevel}`
+  );
 
   // Run setup script
   await exec.exec('bash', [setupScriptPath, kver], { cwd: kernelDir });
@@ -77,15 +92,13 @@ export async function setupKernelSU(
       // Setup opam and coccinelle
       await exec.exec('opam', ['init', '--disable-sandboxing', '--yes']);
 
-          // Get opam environment
-          await exec.exec('opam', ['env']);
-      // Install coccinelle
-      await exec.exec('opam', ['install', '--yes', 'coccinelle']);
+      // Install coccinelle with opam environment evaluated
+      await exec.exec('bash', ['-c', 'eval $(opam env) && opam install --yes coccinelle']);
 
-      // Apply patches
+      // Apply patches with opam environment evaluated
       const applyCocciPath = path.join(getActionPath(), 'kernelsu', 'apply_cocci.py');
       try {
-        await exec.exec('python3', [applyCocciPath], { cwd: kernelDir });
+        await exec.exec('bash', ['-c', `eval $(opam env) && python3 ${applyCocciPath}`], { cwd: kernelDir });
       } catch {
         core.warning('Failed to apply KernelSU patches');
       }
@@ -102,11 +115,9 @@ export async function setupBBG(kernelDir: string, configPath: string): Promise<v
   core.startGroup('Initializing BBG');
 
   // Download and run setup script
-  await exec.exec('curl', [
-    '-Ss',
-    'https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh',
-    '|',
-    'bash',
+  await exec.exec('bash', [
+    '-c',
+    'curl -Ss https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash',
   ]);
 
   // Modify Kconfig

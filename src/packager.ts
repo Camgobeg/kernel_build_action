@@ -12,6 +12,7 @@ export interface PackageConfig {
   anykernel3Url?: string;
   bootimgUrl?: string;
   buildDir: string;
+  release?: boolean;
 }
 
 /**
@@ -40,7 +41,14 @@ export async function packageBootimg(config: PackageConfig): Promise<void> {
   // Download boot.img
   const bootimgPath = path.join(splitDir, 'boot.img');
   core.info(`Downloading boot.img from: ${config.bootimgUrl}`);
-  await exec.exec('aria2c', [config.bootimgUrl, '-o', bootimgPath]);
+
+  // Validate URL doesn't start with hyphen to prevent command injection
+  if (config.bootimgUrl.startsWith('-')) {
+    throw new Error('bootimg-url must not start with a hyphen');
+  }
+
+  // Use -- separator to prevent option parsing
+  await exec.exec('aria2c', ['--', config.bootimgUrl, '-o', bootimgPath]);
 
   // Unpack boot.img
   const nohupPath = path.join(splitDir, 'nohup.out');
@@ -116,9 +124,9 @@ export async function packageAnyKernel3(config: PackageConfig): Promise<void> {
   }
 
   if (config.anykernel3Url) {
-    await exec.exec('git', ['clone', config.anykernel3Url, anykernelDir]);
+    await exec.exec('git', ['clone', '--', config.anykernel3Url, anykernelDir]);
   } else {
-    await exec.exec('git', ['clone', 'https://github.com/osm0sis/AnyKernel3', anykernelDir]);
+    await exec.exec('git', ['clone', '--', 'https://github.com/osm0sis/AnyKernel3', anykernelDir]);
 
     // Modify anykernel.sh for generic use
     const anykernelSh = path.join(anykernelDir, 'anykernel.sh');
@@ -185,7 +193,7 @@ export async function packageAnyKernel3(config: PackageConfig): Promise<void> {
   fs.mkdirSync(config.buildDir, { recursive: true });
 
   // Create zip if releasing, otherwise copy files
-  if (process.env.RELEASE_MODE === 'true') {
+  if (config.release) {
     const zipPath = path.join(config.buildDir, 'AnyKernel3-flasher.zip');
     await exec.exec('zip', ['-r', zipPath, '.'], { cwd: anykernelDir });
     core.info(`Created: ${zipPath}`);

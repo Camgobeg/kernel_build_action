@@ -42,13 +42,18 @@ async function downloadAndExtract(
   if (url.endsWith('.zip')) {
     const zipPath = await tc.downloadTool(url, `${outputName}.zip`);
     await tc.extractZip(zipPath, extractDir);
-  } else if (url.endsWith('.tar.gz') || url.endsWith('.gz') || url.endsWith('.xz') || url.endsWith('.bz2')) {
+  } else if (
+    url.endsWith('.tar.gz') ||
+    url.endsWith('.gz') ||
+    url.endsWith('.xz') ||
+    url.endsWith('.bz2')
+  ) {
     const ext = url.endsWith('.tar.gz') ? '.tar.gz' : path.extname(url);
     const tarPath = await tc.downloadTool(url, `${outputName}${ext}`);
     await tc.extractTar(tarPath, extractDir);
   } else {
     // Git clone
-    await exec.exec('git', ['clone', '--depth=1', '-b', branch, url, extractDir]);
+    await exec.exec('git', ['clone', '--depth=1', '-b', branch, '--', url, extractDir]);
   }
 }
 

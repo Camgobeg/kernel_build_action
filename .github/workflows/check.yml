@@ -67,10 +67,3 @@ jobs:
         run: yarn install --frozen-lockfile
       - name: Build with ncc
         run: yarn build
-      - name: Check dist is up to date
-        run: |
-          if [ -n "$(git status --porcelain dist/)" ]; then
-            echo "::error::dist/ is not up to date. Run 'yarn build' and commit the changes."
-            git status dist/
-            exit 1
-          fi

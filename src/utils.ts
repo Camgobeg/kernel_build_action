@@ -133,7 +133,7 @@ export async function installSystemClang(): Promise<void> {
  * Get action path
  */
 export function getActionPath(): string {
-  return process.env.GITHUB_ACTION_PATH || __dirname;
+  return process.env.GITHUB_ACTION_PATH || path.join(__dirname, '..');
 }
 
 /**

@@ -78,7 +78,7 @@ export async function createRelease(config: ReleaseConfig): Promise<void> {
         repo: context.repo.repo,
         release_id: release.id,
         name: fileName,
-        data: fileData as unknown as string,
+        data: fileData as any,
       });
 
       core.info(`Uploaded: ${fileName}`);
