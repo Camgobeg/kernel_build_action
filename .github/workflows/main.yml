@@ -5,6 +5,8 @@ on:
     paths:
       - '.github/workflows/main.yml'
       - 'action.yml'
+      - 'src/*.ts'
+      - 'package.json'
 
   pull_request:
   workflow_dispatch:
