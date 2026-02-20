@@ -206,6 +206,7 @@ export async function buildKernel(config: BuildConfig): Promise<boolean> {
       },
     });
   } catch (error) {
+    core.debug(`Build command failed: ${error}`);
     exitCode = 1;
   }
 
