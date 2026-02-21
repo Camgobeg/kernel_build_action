@@ -741,11 +741,6 @@
     https-proxy-agent "^7.0.0"
     tslib "^2.6.2"
 
-"@vercel/ncc@^0.38.1":
-  version "0.38.4"
-  resolved "https://registry.npmmirror.com/@vercel/ncc/-/ncc-0.38.4.tgz"
-  integrity sha512-8LwjnlP39s08C08J5NstzriPvW1SP8Zfpp1BvC2sI35kPeZnHfxVkCwu4/+Wodgnd60UtT1n8K8zw+Mp7J9JmQ==
-
 abort-controller@^3.0.0:
   version "3.0.0"
   resolved "https://registry.npmmirror.com/abort-controller/-/abort-controller-3.0.0.tgz"
