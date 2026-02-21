@@ -53,7 +53,7 @@ export async function uploadArtifacts(config: ArtifactConfig): Promise<void> {
     await artifactClient.uploadArtifact(artifactName, files, config.buildDir);
     core.info(`Successfully uploaded ${files.length} file(s) as ${artifactName}`);
   } catch (error) {
-    throw new Error(`Failed to upload artifacts: ${error}`);
+    throw new Error(`Failed to upload artifacts: ${error}`, { cause: error });
   }
 
   core.endGroup();

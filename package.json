@@ -1,6 +1,6 @@
 {
   "name": "kernel-build-action",
-  "version": "1.0.0",
+  "version": "1.9.2",
   "description": "Android Kernel Build Action",
   "main": "dist/index.js",
   "scripts": {
@@ -22,11 +22,12 @@
     "@octokit/rest": "^22.0.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.0",
     "@types/node": "^25.3.0",
     "@typescript-eslint/eslint-plugin": "^8.5.0",
     "@typescript-eslint/parser": "^8.5.0",
     "@vercel/ncc": "^0.38.1",
-    "eslint": "^9.39.2",
+    "eslint": "^10.0.0",
     "prettier": "^3.2.5",
     "typescript": "^5.4.4"
   }

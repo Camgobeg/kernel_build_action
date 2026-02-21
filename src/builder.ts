@@ -188,7 +188,7 @@ export async function buildKernel(config: BuildConfig): Promise<boolean> {
 
   // Run make using bash to match the bash script behavior exactly
   // This ensures environment variables are handled the same way
-  let exitCode = 0;
+  let exitCode: number;
   try {
     // Use exec.exec with the constructed environment
     exitCode = await exec.exec('make', makeCmdArgs, {

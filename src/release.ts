@@ -84,7 +84,7 @@ export async function createRelease(config: ReleaseConfig): Promise<void> {
       core.info(`Uploaded: ${fileName}`);
     }
   } catch (error) {
-    throw new Error(`Failed to create release: ${error}`);
+    throw new Error(`Failed to create release: ${error}`, { cause: error });
   }
 
   core.endGroup();
