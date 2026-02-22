@@ -2,10 +2,11 @@ import * as cache from '@actions/cache';
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import { dirExists } from './utils';
 
-const CCACHE_DIR = path.join(process.env.HOME || '/home/runner', '.ccache');
+const CCACHE_DIR = path.join(process.env.HOME || os.homedir(), '.ccache');
 
 /**
  * Setup ccache cache
@@ -105,8 +106,10 @@ export async function clearCcache(): Promise<void> {
  * Get ccache environment variables
  */
 export function getCcacheEnv(): { [key: string]: string } {
+  // Calculate at runtime to allow testing with different HOME values
+  const ccacheDir = path.join(process.env.HOME || os.homedir(), '.ccache');
   return {
-    CCACHE_DIR,
+    CCACHE_DIR: ccacheDir,
     USE_CCACHE: '1',
   };
 }

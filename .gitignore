@@ -20,3 +20,4 @@
 .mypy_cache/
 node_modules
 action.yml.1
+coverage/
