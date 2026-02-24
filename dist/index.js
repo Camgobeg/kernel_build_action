@@ -21702,6 +21702,121 @@ var require_browser = __commonJS({
   }
 });
 
+// node_modules/has-flag/index.js
+var require_has_flag = __commonJS({
+  "node_modules/has-flag/index.js"(exports2, module2) {
+    "use strict";
+    module2.exports = (flag, argv = process.argv) => {
+      const prefix2 = flag.startsWith("-") ? "" : flag.length === 1 ? "-" : "--";
+      const position = argv.indexOf(prefix2 + flag);
+      const terminatorPosition = argv.indexOf("--");
+      return position !== -1 && (terminatorPosition === -1 || position < terminatorPosition);
+    };
+  }
+});
+
+// node_modules/supports-color/index.js
+var require_supports_color = __commonJS({
+  "node_modules/supports-color/index.js"(exports2, module2) {
+    "use strict";
+    var os11 = require("os");
+    var tty = require("tty");
+    var hasFlag = require_has_flag();
+    var { env } = process;
+    var forceColor;
+    if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
+      forceColor = 0;
+    } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
+      forceColor = 1;
+    }
+    if ("FORCE_COLOR" in env) {
+      if (env.FORCE_COLOR === "true") {
+        forceColor = 1;
+      } else if (env.FORCE_COLOR === "false") {
+        forceColor = 0;
+      } else {
+        forceColor = env.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env.FORCE_COLOR, 10), 3);
+      }
+    }
+    function translateLevel(level) {
+      if (level === 0) {
+        return false;
+      }
+      return {
+        level,
+        hasBasic: true,
+        has256: level >= 2,
+        has16m: level >= 3
+      };
+    }
+    function supportsColor(haveStream, streamIsTTY) {
+      if (forceColor === 0) {
+        return 0;
+      }
+      if (hasFlag("color=16m") || hasFlag("color=full") || hasFlag("color=truecolor")) {
+        return 3;
+      }
+      if (hasFlag("color=256")) {
+        return 2;
+      }
+      if (haveStream && !streamIsTTY && forceColor === void 0) {
+        return 0;
+      }
+      const min = forceColor || 0;
+      if (env.TERM === "dumb") {
+        return min;
+      }
+      if (process.platform === "win32") {
+        const osRelease = os11.release().split(".");
+        if (Number(osRelease[0]) >= 10 && Number(osRelease[2]) >= 10586) {
+          return Number(osRelease[2]) >= 14931 ? 3 : 2;
+        }
+        return 1;
+      }
+      if ("CI" in env) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env) || env.CI_NAME === "codeship") {
+          return 1;
+        }
+        return min;
+      }
+      if ("TEAMCITY_VERSION" in env) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env.TEAMCITY_VERSION) ? 1 : 0;
+      }
+      if (env.COLORTERM === "truecolor") {
+        return 3;
+      }
+      if ("TERM_PROGRAM" in env) {
+        const version4 = parseInt((env.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env.TERM_PROGRAM) {
+          case "iTerm.app":
+            return version4 >= 3 ? 3 : 2;
+          case "Apple_Terminal":
+            return 2;
+        }
+      }
+      if (/-256(color)?$/i.test(env.TERM)) {
+        return 2;
+      }
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env.TERM)) {
+        return 1;
+      }
+      if ("COLORTERM" in env) {
+        return 1;
+      }
+      return min;
+    }
+    function getSupportLevel(stream6) {
+      const level = supportsColor(stream6, stream6 && stream6.isTTY);
+      return translateLevel(level);
+    }
+    module2.exports = {
+      supportsColor: getSupportLevel,
+      stdout: translateLevel(supportsColor(true, tty.isatty(1))),
+      stderr: translateLevel(supportsColor(true, tty.isatty(2)))
+    };
+  }
+});
+
 // node_modules/debug/src/node.js
 var require_node = __commonJS({
   "node_modules/debug/src/node.js"(exports2, module2) {
@@ -21720,7 +21835,7 @@ var require_node = __commonJS({
     );
     exports2.colors = [6, 2, 3, 4, 5, 1];
     try {
-      const supportsColor = require("supports-color");
+      const supportsColor = require_supports_color();
       if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
         exports2.colors = [
           20,
@@ -40516,9 +40631,9 @@ var require_isPlainObject = __commonJS({
   }
 });
 
-// node_modules/glob/node_modules/minimatch/dist/commonjs/assert-valid-pattern.js
+// node_modules/minimatch/dist/commonjs/assert-valid-pattern.js
 var require_assert_valid_pattern = __commonJS({
-  "node_modules/glob/node_modules/minimatch/dist/commonjs/assert-valid-pattern.js"(exports2) {
+  "node_modules/minimatch/dist/commonjs/assert-valid-pattern.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.assertValidPattern = void 0;
@@ -40535,9 +40650,9 @@ var require_assert_valid_pattern = __commonJS({
   }
 });
 
-// node_modules/glob/node_modules/minimatch/dist/commonjs/brace-expressions.js
+// node_modules/minimatch/dist/commonjs/brace-expressions.js
 var require_brace_expressions = __commonJS({
-  "node_modules/glob/node_modules/minimatch/dist/commonjs/brace-expressions.js"(exports2) {
+  "node_modules/minimatch/dist/commonjs/brace-expressions.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.parseClass = void 0;
@@ -40652,9 +40767,9 @@ var require_brace_expressions = __commonJS({
   }
 });
 
-// node_modules/glob/node_modules/minimatch/dist/commonjs/unescape.js
+// node_modules/minimatch/dist/commonjs/unescape.js
 var require_unescape = __commonJS({
-  "node_modules/glob/node_modules/minimatch/dist/commonjs/unescape.js"(exports2) {
+  "node_modules/minimatch/dist/commonjs/unescape.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.unescape = void 0;
@@ -40665,9 +40780,9 @@ var require_unescape = __commonJS({
   }
 });
 
-// node_modules/glob/node_modules/minimatch/dist/commonjs/ast.js
+// node_modules/minimatch/dist/commonjs/ast.js
 var require_ast = __commonJS({
-  "node_modules/glob/node_modules/minimatch/dist/commonjs/ast.js"(exports2) {
+  "node_modules/minimatch/dist/commonjs/ast.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.AST = void 0;
@@ -41154,9 +41269,9 @@ var require_ast = __commonJS({
   }
 });
 
-// node_modules/glob/node_modules/minimatch/dist/commonjs/escape.js
+// node_modules/minimatch/dist/commonjs/escape.js
 var require_escape = __commonJS({
-  "node_modules/glob/node_modules/minimatch/dist/commonjs/escape.js"(exports2) {
+  "node_modules/minimatch/dist/commonjs/escape.js"(exports2) {
     "use strict";
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.escape = void 0;
@@ -41167,9 +41282,9 @@ var require_escape = __commonJS({
   }
 });
 
-// node_modules/glob/node_modules/minimatch/dist/commonjs/index.js
+// node_modules/minimatch/dist/commonjs/index.js
 var require_commonjs3 = __commonJS({
-  "node_modules/glob/node_modules/minimatch/dist/commonjs/index.js"(exports2) {
+  "node_modules/minimatch/dist/commonjs/index.js"(exports2) {
     "use strict";
     var __importDefault = exports2 && exports2.__importDefault || function(mod) {
       return mod && mod.__esModule ? mod : { "default": mod };
@@ -58398,7 +58513,7 @@ var Path = class {
 var { Minimatch } = import_minimatch.default;
 var IS_WINDOWS6 = process.platform === "win32";
 var Pattern = class _Pattern {
-  constructor(patternOrNegate, isImplicitPattern = false, segments, homedir2) {
+  constructor(patternOrNegate, isImplicitPattern = false, segments, homedir3) {
     this.negate = false;
     let pattern;
     if (typeof patternOrNegate === "string") {
@@ -58417,7 +58532,7 @@ var Pattern = class _Pattern {
       this.negate = !this.negate;
       pattern = pattern.substr(1).trim();
     }
-    pattern = _Pattern.fixupPattern(pattern, homedir2);
+    pattern = _Pattern.fixupPattern(pattern, homedir3);
     this.segments = new Path(pattern).segments;
     this.trailingSeparator = normalizeSeparators2(pattern).endsWith(path7.sep);
     pattern = safeTrimTrailingSeparator(pattern);
@@ -58473,7 +58588,7 @@ var Pattern = class _Pattern {
   /**
    * Normalizes slashes and ensures absolute root
    */
-  static fixupPattern(pattern, homedir2) {
+  static fixupPattern(pattern, homedir3) {
     (0, import_assert4.default)(pattern, "pattern cannot be empty");
     const literalSegments = new Path(pattern).segments.map((x) => _Pattern.getLiteral(x));
     (0, import_assert4.default)(literalSegments.every((x, i) => (x !== "." || i === 0) && x !== ".."), `Invalid pattern '${pattern}'. Relative pathing '.' and '..' is not allowed.`);
@@ -58482,10 +58597,10 @@ var Pattern = class _Pattern {
     if (pattern === "." || pattern.startsWith(`.${path7.sep}`)) {
       pattern = _Pattern.globEscape(process.cwd()) + pattern.substr(1);
     } else if (pattern === "~" || pattern.startsWith(`~${path7.sep}`)) {
-      homedir2 = homedir2 || os6.homedir();
-      (0, import_assert4.default)(homedir2, "Unable to determine HOME directory");
-      (0, import_assert4.default)(hasAbsoluteRoot(homedir2), `Expected HOME directory to be a rooted path. Actual '${homedir2}'`);
-      pattern = _Pattern.globEscape(homedir2) + pattern.substr(1);
+      homedir3 = homedir3 || os6.homedir();
+      (0, import_assert4.default)(homedir3, "Unable to determine HOME directory");
+      (0, import_assert4.default)(hasAbsoluteRoot(homedir3), `Expected HOME directory to be a rooted path. Actual '${homedir3}'`);
+      pattern = _Pattern.globEscape(homedir3) + pattern.substr(1);
     } else if (IS_WINDOWS6 && (pattern.match(/^[A-Z]:$/i) || pattern.match(/^[A-Z]:[^\\]/i))) {
       let root = ensureAbsoluteRoot("C:\\dummy-root", pattern.substr(0, 2));
       if (pattern.length > 2 && !root.endsWith("\\")) {
@@ -90442,8 +90557,9 @@ function saveCacheV2(paths_1, key_1, options_1) {
 
 // src/cache.ts
 var fs9 = __toESM(require("fs"));
+var os8 = __toESM(require("os"));
 var path12 = __toESM(require("path"));
-var CCACHE_DIR = path12.join(process.env.HOME || "/home/runner", ".ccache");
+var CCACHE_DIR = path12.join(process.env.HOME || os8.homedir(), ".ccache");
 async function setupCcache(config) {
   startGroup("Setting up ccache");
   if (!dirExists(CCACHE_DIR)) {
@@ -91345,7 +91461,7 @@ function sedReplaceInRange(filePath, startPattern, endPattern, search, replace) 
 
 // src/builder.ts
 var fs15 = __toESM(require("fs"));
-var os8 = __toESM(require("os"));
+var os9 = __toESM(require("os"));
 var path17 = __toESM(require("path"));
 async function buildKernel(config) {
   startGroup("Building Kernel with selected cross compiler");
@@ -91425,7 +91541,7 @@ async function buildKernel(config) {
   const extraArgs = parseExtraMakeArgs(config.extraMakeArgs);
   const safeExtraArgs = filterMakeArgs(extraArgs);
   const makeArgs = [
-    `-j${os8.cpus().length}`,
+    `-j${os9.cpus().length}`,
     config.config,
     `ARCH=${config.arch}`,
     "O=out",
@@ -94897,6 +95013,86 @@ var endpoint = withDefaults(null, DEFAULTS);
 // node_modules/@octokit/request/dist-bundle/index.js
 var import_fast_content_type_parse = __toESM(require_fast_content_type_parse(), 1);
 
+// node_modules/json-with-bigint/json-with-bigint.js
+var noiseValue = /^-?\d+n+$/;
+var originalStringify = JSON.stringify;
+var originalParse = JSON.parse;
+var JSONStringify = (value, replacer, space) => {
+  if ("rawJSON" in JSON) {
+    return originalStringify(
+      value,
+      (key, value2) => {
+        if (typeof value2 === "bigint") return JSON.rawJSON(value2.toString());
+        if (typeof replacer === "function") return replacer(key, value2);
+        if (Array.isArray(replacer) && replacer.includes(key)) return value2;
+        return value2;
+      },
+      space
+    );
+  }
+  if (!value) return originalStringify(value, replacer, space);
+  const bigInts = /([\[:])?"(-?\d+)n"($|([\\n]|\s)*(\s|[\\n])*[,\}\]])/g;
+  const noise = /([\[:])?("-?\d+n+)n("$|"([\\n]|\s)*(\s|[\\n])*[,\}\]])/g;
+  const convertedToCustomJSON = originalStringify(
+    value,
+    (key, value2) => {
+      const isNoise = typeof value2 === "string" && Boolean(value2.match(noiseValue));
+      if (isNoise) return value2.toString() + "n";
+      if (typeof value2 === "bigint") return value2.toString() + "n";
+      if (typeof replacer === "function") return replacer(key, value2);
+      if (Array.isArray(replacer) && replacer.includes(key)) return value2;
+      return value2;
+    },
+    space
+  );
+  const processedJSON = convertedToCustomJSON.replace(bigInts, "$1$2$3");
+  const denoisedJSON = processedJSON.replace(noise, "$1$2$3");
+  return denoisedJSON;
+};
+var isContextSourceSupported = () => JSON.parse("1", (_2, __, context5) => !!context5 && context5.source === "1");
+var JSONParseV2 = (text, reviver) => {
+  const intRegex = /^-?\d+$/;
+  return JSON.parse(text, (key, value, context5) => {
+    const isBigNumber = typeof value === "number" && (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER);
+    const isInt = intRegex.test(context5.source);
+    const isBigInt = isBigNumber && isInt;
+    if (isBigInt) return BigInt(context5.source);
+    if (typeof reviver !== "function") return value;
+    return reviver(key, value, context5);
+  });
+};
+var JSONParse = (text, reviver) => {
+  if (!text) return originalParse(text, reviver);
+  if (isContextSourceSupported()) return JSONParseV2(text, reviver);
+  const MAX_INT = Number.MAX_SAFE_INTEGER.toString();
+  const MAX_DIGITS = MAX_INT.length;
+  const stringsOrLargeNumbers = /"(?:\\.|[^"])*"|-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?/g;
+  const noiseValueWithQuotes = /^"-?\d+n+"$/;
+  const customFormat = /^-?\d+n$/;
+  const serializedData = text.replace(
+    stringsOrLargeNumbers,
+    (text2, digits, fractional, exponential) => {
+      const isString = text2[0] === '"';
+      const isNoise = isString && Boolean(text2.match(noiseValueWithQuotes));
+      if (isNoise) return text2.substring(0, text2.length - 1) + 'n"';
+      const isFractionalOrExponential = fractional || exponential;
+      const isLessThanMaxSafeInt = digits && (digits.length < MAX_DIGITS || digits.length === MAX_DIGITS && digits <= MAX_INT);
+      if (isString || isFractionalOrExponential || isLessThanMaxSafeInt)
+        return text2;
+      return '"' + text2 + 'n"';
+    }
+  );
+  return originalParse(serializedData, (key, value, context5) => {
+    const isCustomFormatBigInt = typeof value === "string" && Boolean(value.match(customFormat));
+    if (isCustomFormatBigInt)
+      return BigInt(value.substring(0, value.length - 1));
+    const isNoiseValue = typeof value === "string" && Boolean(value.match(noiseValue));
+    if (isNoiseValue) return value.substring(0, value.length - 1);
+    if (typeof reviver !== "function") return value;
+    return reviver(key, value, context5);
+  });
+};
+
 // node_modules/@octokit/request-error/dist-src/index.js
 var RequestError = class extends Error {
   name;
@@ -94937,7 +95133,7 @@ var RequestError = class extends Error {
 };
 
 // node_modules/@octokit/request/dist-bundle/index.js
-var VERSION2 = "10.0.7";
+var VERSION2 = "10.0.8";
 var defaults_default = {
   headers: {
     "user-agent": `octokit-request.js/${VERSION2} ${getUserAgent()}`
@@ -94961,7 +95157,7 @@ async function fetchWrapper(requestOptions) {
   }
   const log2 = requestOptions.request?.log || console;
   const parseSuccessResponseBody = requestOptions.request?.parseSuccessResponseBody !== false;
-  const body2 = isPlainObject2(requestOptions.body) || Array.isArray(requestOptions.body) ? JSON.stringify(requestOptions.body) : requestOptions.body;
+  const body2 = isPlainObject2(requestOptions.body) || Array.isArray(requestOptions.body) ? JSONStringify(requestOptions.body) : requestOptions.body;
   const requestHeaders = Object.fromEntries(
     Object.entries(requestOptions.headers).map(([name, value]) => [
       name,
@@ -95060,7 +95256,7 @@ async function getResponseData(response) {
     let text = "";
     try {
       text = await response.text();
-      return JSON.parse(text);
+      return JSONParse(text);
     } catch (err) {
       return text;
     }

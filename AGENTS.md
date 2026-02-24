@@ -17,6 +17,7 @@ This is the **Android Kernel Build Action** - a comprehensive GitHub Action that
 - **Node.js 20** (runtime environment)
 - **@actions/toolkit** (core, exec, cache, artifact, github, tool-cache)
 - **esbuild** (fast bundler for distribution)
+- **Vitest** (testing framework with coverage support)
 - **Python 3** (kernel patch scripts)
 - **Android NDK/AOSP toolchains** (GCC and Clang)
 - **Various kernel modification frameworks** (KernelSU, NetHunter, LXC, Re-Kernel, BBG)
@@ -32,6 +33,7 @@ This is the **Android Kernel Build Action** - a comprehensive GitHub Action that
 ├── mkdtboimg.py            # Python tool for DTB/DTBO image manipulation
 ├── package.json            # Node.js dependencies and scripts
 ├── tsconfig.json           # TypeScript compiler configuration
+├── vitest.config.ts        # Vitest testing configuration
 ├── yarn.lock               # Yarn dependency lock file
 ├── eslint.config.js        # ESLint flat configuration (v9+)
 ├── .prettierrc             # Prettier formatting configuration
@@ -59,6 +61,19 @@ This is the **Android Kernel Build Action** - a comprehensive GitHub Action that
 │   ├── artifact.ts         # @actions/artifact integration
 │   ├── release.ts          # GitHub Release creation
 │   └── utils.ts            # Utility functions
+├── __tests__/              # Vitest test files
+│   ├── artifact.test.ts
+│   ├── builder.test.ts
+│   ├── cache.test.ts
+│   ├── clean.test.ts
+│   ├── config.test.ts
+│   ├── error.test.ts
+│   ├── kernel.test.ts
+│   ├── packager.test.ts
+│   ├── patches.test.ts
+│   ├── release.test.ts
+│   ├── toolchain.test.ts
+│   └── utils.test.ts
 ├── .gemini/                # AI assistant configuration
 │   ├── config.yaml
 │   └── styleguide.md
@@ -70,7 +85,7 @@ This is the **Android Kernel Build Action** - a comprehensive GitHub Action that
 │   │   ├── common.yml
 │   │   └── config.yml
 │   └── workflows/
-│       ├── main.yml        # Main test workflow
+│       ├── main.yml        # Main CI test workflow
 │       ├── build.yml       # Build verification
 │       ├── lint.yml        # Linting checks
 │       ├── check.yml       # Code quality checks
@@ -158,11 +173,17 @@ yarn install
 # Build (compile TypeScript to dist/ using esbuild)
 yarn build
 
+# Run tests with coverage
+yarn test
+
 # Lint
 yarn lint
 
 # Format
 yarn format
+
+# Check formatting
+yarn format:check
 ```
 
 ### Build Process
@@ -172,6 +193,25 @@ yarn format
    - `src/post.ts` → `dist/post/index.js` (post entry, CJS format)
 2. **Target**: Node.js 20, platform: node
 3. **Distribution**: Both bundled files must be committed for GitHub Actions use
+
+### Testing
+
+The project uses **Vitest** for testing with the following features:
+- **Coverage**: V8 provider with lcov, text, and json-summary reporters
+- **Test files**: Located in `__tests__/` directory
+- **Globals**: Enabled for test functions
+- **Environment**: Node.js
+
+```bash
+# Run tests once
+yarn test --run
+
+# Run tests in watch mode
+yarn test
+
+# Run tests with coverage
+yarn test --coverage
+```
 
 ### Usage
 
@@ -201,7 +241,7 @@ Users reference the action in workflows:
 - `@octokit/rest` ^22.0.1: GitHub REST API
 - `@octokit/core` ^7.0.6: GitHub API core
 - `@octokit/graphql` ^9.0.3: GitHub GraphQL API
-- `@octokit/request` ^10.0.7: GitHub API requests
+- `@octokit/request` ^10.0.8: GitHub API requests
 
 ### Development
 - `typescript` ^5.4.4: TypeScript compiler
@@ -212,6 +252,8 @@ Users reference the action in workflows:
 - `@typescript-eslint/parser` ^8.5.0: TypeScript ESLint parser
 - `prettier` ^3.2.5: Formatting
 - `@types/node` ^25.3.0: Type definitions
+- `vitest` ^2.0.0: Testing framework
+- `@vitest/coverage-v8` ^2.0.0: Test coverage provider
 
 ## Key Features
 
@@ -246,7 +288,11 @@ Users reference the action in workflows:
 - Uses flat config format (ESLint v9+)
 - TypeScript support via @typescript-eslint
 - Configured for Node.js globals
-- Rules: no-explicit-any off, explicit-function-return-type off
+- Rules:
+  - `@typescript-eslint/no-explicit-any`: off
+  - `@typescript-eslint/explicit-function-return-type`: off
+  - `@typescript-eslint/no-unused-vars`: warn (with ignore patterns for `_`)
+  - `no-console`: off
 
 ### Prettier Configuration (.prettierrc)
 - semi: true
@@ -259,7 +305,18 @@ Users reference the action in workflows:
 - Target: ES2022
 - Module: commonjs
 - Strict mode enabled
-- Inline source maps
+- Inline source maps and sources
+- Experimental decorators enabled
+- ESModule interop enabled
+
+### Vitest Configuration (vitest.config.ts)
+- Environment: node
+- Coverage provider: v8
+- Coverage reporters: text, lcov, json-summary
+- Coverage includes: src/**/*.ts
+- Coverage excludes: src/index.ts, src/post.ts (entry points)
+- Test files: __tests__/**/*.ts
+- Globals: true
 
 ## Git Commit Conventions
 
@@ -278,6 +335,7 @@ Types:
 - `build`: Build system changes
 - `docs`: Documentation changes
 - `refactor`: Code refactoring
+- `test`: Testing related changes
 
 Example:
 ```
@@ -294,6 +352,9 @@ Signed-off-by: user <user@example.com>
 Before committing, always run:
 
 ```bash
+# Run tests
+yarn test --run
+
 # Lint TypeScript files
 yarn lint
 
@@ -310,11 +371,12 @@ yarn build
 ### Workflow Checks
 
 The project has several GitHub workflows:
+- `main.yml`: Main CI test workflow (builds actual kernel)
 - `build.yml`: Verifies the action builds successfully
 - `lint.yml`: Runs ESLint and Prettier checks
 - `check.yml`: Additional code quality checks
 - `lkm.yml`: Tests LKM (Loadable Kernel Module) functionality
-- `main.yml`: Main test workflow
+- `close-pr.yml`: PR automation
 
 ## Migration Notes
 
@@ -329,3 +391,10 @@ ESLint configuration moved from `.eslintrc.json` to `eslint.config.js`:
 - Uses new flat config format (ESLint v9+)
 - Better TypeScript integration
 - Improved performance
+
+### Testing Framework
+The project now uses **Vitest** for testing:
+- Modern, fast test runner
+- Built-in TypeScript support
+- V8 coverage provider
+- Compatible with Jest-style assertions
