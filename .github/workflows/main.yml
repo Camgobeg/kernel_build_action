@@ -36,7 +36,7 @@ jobs:
           config: exynos7420-noblelte_defconfig
           arch: arm64
           aosp-gcc: true
-          aosp-clang: true
+          aosp-clang: false
           ksu: false
           android-version: 14
           aosp-clang-version: r383902
